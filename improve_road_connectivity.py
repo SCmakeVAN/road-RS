@@ -1,0 +1,54 @@
+from sknw import build_sknw
+from skimage.morphology import skeletonize
+import cv2
+import numpy as np
+import math
+
+def distance(pstart,pend):
+
+    x=(pstart[0]-pend[0])*(pstart[0]-pend[0])
+    y=(pstart[1]-pend[1])*(pstart[1]-pend[1])
+    dis=math.sqrt(x+y)
+    return dis
+
+
+def patch_regular(gt,tau,thickness):
+    green=(0, 255, 0)
+    #gt=tifffile.imread(img_path)
+    ske = skeletonize(gt).astype(np.uint16)
+    graph = build_sknw(ske)
+    points=[]
+    nodes=set()
+    # draw edges by pts
+    for (s,e) in graph.edges():
+        ps = graph[s][e]['pts']
+        p1=[float(ps[0,0]),float(ps[0,1])]
+        p2=[float(ps[-1,0]),float(ps[-1,1])]
+        nodes.add(str(p1))
+        nodes.add(str(p2))
+        points.append({str(p1),str(p2)})
+        for i in range(0,len(ps)-1):
+            cv2.line(gt,(int(ps[i,1]),int(ps[i,0])), (int(ps[i+1,1]),int(ps[i+1,0])), 1,thickness=thickness)
+    ps=[eval(i) for i in list(nodes)]
+    for num in range(len(ps)):
+        mindis=float("inf")#这个表示正无穷
+        for other in range(len(ps)):
+            if other!=num and {str(ps[num]),str(ps[other])} not in points:
+
+                dis= distance(ps[num],ps[other])
+                if dis<mindis:
+                    mindis=dis
+                    mindis_point=other
+        if mindis<tau:
+            cv2.line(gt,(int(ps[num][1]),int(ps[num][0])), (int(ps[mindis_point][1]),int(ps[mindis_point][0])),green,thickness=thickness+5)
+
+    return gt
+
+
+if __name__ == '__main__':
+
+    img=cv2.imread('test.png')
+    t=patch_regular(img,500,1)
+    cv2.imwrite('result.png',t)
+
+    print('ok')
